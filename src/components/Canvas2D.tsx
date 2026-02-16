@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { Body } from '@/lib/physics';
 
 interface Canvas2DProps {
@@ -14,23 +14,7 @@ export default function Canvas2D({ bodies, showTrails }: Canvas2DProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-
-    const resizeObserver = new ResizeObserver(() => {
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = container.clientWidth * dpr;
-      canvas.height = container.clientHeight * dpr;
-      canvas.style.width = container.clientWidth + 'px';
-      canvas.style.height = container.clientHeight + 'px';
-    });
-    resizeObserver.observe(container);
-    return () => resizeObserver.disconnect();
-  }, []);
-
-  useEffect(() => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -39,6 +23,8 @@ export default function Canvas2D({ bodies, showTrails }: Canvas2DProps) {
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.width;
     const h = canvas.height;
+
+    if (w === 0 || h === 0) return;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, w, h);
@@ -60,11 +46,12 @@ export default function Canvas2D({ bodies, showTrails }: Canvas2DProps) {
     }
     ctx.restore();
 
+    if (bodies.length === 0) return;
+
     // Compute auto-scale: fit all body positions + margin
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     bodies.forEach((b) => {
-      // Include trail points
-      const points = showTrails ? [b.position, ...b.trail] : [b.position];
+      const points = showTrails && b.trail.length > 0 ? [b.position, ...b.trail] : [b.position];
       points.forEach((p) => {
         if (p.x < minX) minX = p.x;
         if (p.x > maxX) maxX = p.x;
@@ -94,23 +81,6 @@ export default function Canvas2D({ bodies, showTrails }: Canvas2DProps) {
 
     // Draw trails
     if (showTrails) {
-      bodies.forEach((body) => {
-        if (body.trail.length < 2) return;
-        ctx.beginPath();
-        const [sx, sy] = toScreen(body.trail[0].x, body.trail[0].y);
-        ctx.moveTo(sx, sy);
-        for (let i = 1; i < body.trail.length; i++) {
-          const [tx, ty] = toScreen(body.trail[i].x, body.trail[i].y);
-          ctx.lineTo(tx, ty);
-        }
-        ctx.strokeStyle = body.color;
-        ctx.lineWidth = 1.5 * dpr;
-        ctx.globalAlpha = 0.5;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      });
-
-      // Draw trail fading: redraw trail segments with gradient alpha
       bodies.forEach((body) => {
         const len = body.trail.length;
         if (len < 2) return;
@@ -153,6 +123,36 @@ export default function Canvas2D({ bodies, showTrails }: Canvas2DProps) {
       ctx.fill();
     });
   }, [bodies, showTrails]);
+
+  // Set up canvas sizing
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = container.clientWidth * dpr;
+      canvas.height = container.clientHeight * dpr;
+      canvas.style.width = container.clientWidth + 'px';
+      canvas.style.height = container.clientHeight + 'px';
+      // Immediately redraw after resize
+      draw();
+    };
+
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(container);
+
+    // Initial sizing + draw
+    resize();
+
+    return () => resizeObserver.disconnect();
+  }, [draw]);
+
+  // Redraw whenever bodies or trails change
+  useEffect(() => {
+    draw();
+  }, [draw]);
 
   return (
     <div ref={containerRef} className="w-full h-full absolute inset-0">

@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export function useSound() {
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false); // Start unmuted
   const [volume, setVolume] = useState(0.3);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const droneRef = useRef<OscillatorNode | null>(null);
   const gainRef = useRef<GainNode | null>(null);
-  const pingGainRef = useRef<GainNode | null>(null);
-  const isMutedRef = useRef(true);
+  const isMutedRef = useRef(false); // Start unmuted
   const volumeRef = useRef(0.3);
   const initRef = useRef(false);
+  const isPausedRef = useRef(false);
 
   const init = useCallback(() => {
     if (initRef.current) return;
@@ -23,7 +23,7 @@ export function useSound() {
 
       // Master gain
       const master = ctx.createGain();
-      master.gain.value = 0;
+      master.gain.value = volumeRef.current; // Start with volume on (unmuted)
       master.connect(ctx.destination);
       gainRef.current = master;
 
@@ -37,12 +37,6 @@ export function useSound() {
       droneGain.connect(master);
       drone.start();
       droneRef.current = drone;
-
-      // Ping gain node for proximity sounds
-      const pg = ctx.createGain();
-      pg.gain.value = 0;
-      pg.connect(master);
-      pingGainRef.current = pg;
     } catch {
       // Web Audio not available
     }
@@ -53,10 +47,10 @@ export function useSound() {
     setIsMuted((prev) => {
       const next = !prev;
       isMutedRef.current = next;
-      if (gainRef.current) {
+      if (gainRef.current && audioCtxRef.current) {
         gainRef.current.gain.setTargetAtTime(
           next ? 0 : volumeRef.current,
-          audioCtxRef.current!.currentTime,
+          audioCtxRef.current.currentTime,
           0.1
         );
       }
@@ -70,8 +64,21 @@ export function useSound() {
   const updateVolume = useCallback((v: number) => {
     volumeRef.current = v;
     setVolume(v);
-    if (gainRef.current && !isMutedRef.current) {
-      gainRef.current.gain.setTargetAtTime(v, audioCtxRef.current!.currentTime, 0.1);
+    if (gainRef.current && !isMutedRef.current && audioCtxRef.current) {
+      gainRef.current.gain.setTargetAtTime(v, audioCtxRef.current.currentTime, 0.1);
+    }
+  }, []);
+
+  /**
+   * Pause/resume audio when simulation pauses/plays.
+   */
+  const setSoundPaused = useCallback((paused: boolean) => {
+    isPausedRef.current = paused;
+    if (!audioCtxRef.current || !gainRef.current) return;
+    if (paused) {
+      gainRef.current.gain.setTargetAtTime(0, audioCtxRef.current.currentTime, 0.2);
+    } else if (!isMutedRef.current) {
+      gainRef.current.gain.setTargetAtTime(volumeRef.current, audioCtxRef.current.currentTime, 0.2);
     }
   }, []);
 
@@ -79,12 +86,13 @@ export function useSound() {
    * Update drone frequency based on system energy.
    */
   const updateDrone = useCallback((energy: number) => {
-    if (!droneRef.current || isMutedRef.current) return;
+    if (!droneRef.current || isMutedRef.current || isPausedRef.current) return;
+    if (!audioCtxRef.current) return;
     // Map energy to frequency range 40–200 Hz
     const freq = 40 + Math.min(Math.abs(energy) * 20, 160);
     droneRef.current.frequency.setTargetAtTime(
       freq,
-      audioCtxRef.current!.currentTime,
+      audioCtxRef.current.currentTime,
       0.3
     );
   }, []);
@@ -93,7 +101,7 @@ export function useSound() {
    * Play a proximity ping when bodies get close.
    */
   const playPing = useCallback((closeness: number) => {
-    if (!audioCtxRef.current || isMutedRef.current) return;
+    if (!audioCtxRef.current || isMutedRef.current || isPausedRef.current) return;
     const ctx = audioCtxRef.current;
     const osc = ctx.createOscillator();
     osc.type = 'triangle';
@@ -123,6 +131,7 @@ export function useSound() {
     updateVolume,
     updateDrone,
     playPing,
+    setSoundPaused,
     init,
   };
 }

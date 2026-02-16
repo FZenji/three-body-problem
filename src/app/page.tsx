@@ -26,12 +26,16 @@ export default function Home() {
   const sound = useSound();
   const [mathOpen, setMathOpen] = useState(false);
   const lastPingRef = useRef(0);
+  const [resetSignal, setResetSignal] = useState(0);
 
   // Keyboard shortcuts
   const keyboardActions = useMemo(
     () => ({
       togglePlay: () => (sim.isPlaying ? sim.pause() : sim.play()),
-      reset: () => sim.reset(),
+      reset: () => {
+        sim.reset();
+        setResetSignal((s) => s + 1);
+      },
       speedUp: () => sim.updateSpeed(Math.min(sim.speedMultiplier + 0.5, 5)),
       speedDown: () => sim.updateSpeed(Math.max(sim.speedMultiplier - 0.5, 0.1)),
       toggleMute: () => sound.toggleMute(),
@@ -60,6 +64,11 @@ export default function Home() {
     }
   }, [sim.bodies, sim.isPlaying, sound]);
 
+  // Pause/resume sound when simulation pauses/plays
+  useEffect(() => {
+    sound.setSoundPaused(!sim.isPlaying);
+  }, [sim.isPlaying, sound]);
+
   // Close math modal with Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -74,6 +83,11 @@ export default function Home() {
     sound.init();
   }, [sound]);
 
+  const handleReset = useCallback(() => {
+    sim.reset();
+    setResetSignal((s) => s + 1);
+  }, [sim]);
+
   return (
     <main
       className="relative w-full h-screen overflow-hidden bg-[#0a0a0f]"
@@ -83,7 +97,7 @@ export default function Home() {
       {sim.dimension === '2D' ? (
         <Canvas2D bodies={sim.bodies} showTrails={sim.showTrails} />
       ) : (
-        <Scene3D bodies={sim.bodies} showTrails={sim.showTrails} />
+        <Scene3D bodies={sim.bodies} showTrails={sim.showTrails} resetSignal={resetSignal} />
       )}
 
       {/* Control Panel */}
@@ -97,7 +111,7 @@ export default function Home() {
         bodies={sim.bodies}
         onPlay={sim.play}
         onPause={sim.pause}
-        onReset={() => sim.reset()}
+        onReset={handleReset}
         onSpeedChange={sim.updateSpeed}
         onTrailLengthChange={sim.updateTrailLength}
         onShowTrailsChange={sim.updateShowTrails}

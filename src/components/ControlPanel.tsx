@@ -5,8 +5,8 @@ import {
   Play, Pause, RotateCcw, ChevronDown, ChevronUp,
   Settings, X, Eye, EyeOff
 } from 'lucide-react';
-import { PRESETS } from '@/lib/presets';
-import { Body } from '@/lib/physics';
+import { PRESETS, CUSTOM_PRESET_NAME } from '@/lib/presets';
+import { Body, Vec3 } from '@/lib/physics';
 
 interface ControlPanelProps {
   isPlaying: boolean;
@@ -24,7 +24,52 @@ interface ControlPanelProps {
   onShowTrailsChange: (show: boolean) => void;
   onPresetChange: (name: string) => void;
   onDimensionChange: (dim: '2D' | '3D') => void;
-  onBodyUpdate: (index: number, updates: Partial<Pick<Body, 'color' | 'size' | 'mass'>>) => void;
+  onBodyUpdate: (index: number, updates: Partial<Pick<Body, 'color' | 'size' | 'mass' | 'position' | 'velocity'>>) => void;
+}
+
+function Vec3Input({
+  label,
+  value,
+  onChange,
+  min = -10,
+  max = 10,
+  step = 0.1,
+}: {
+  label: string;
+  value: Vec3;
+  onChange: (v: Vec3) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+}) {
+  return (
+    <div>
+      <label className="text-[9px] text-white/30 block mb-1">{label}</label>
+      <div className="grid grid-cols-3 gap-1">
+        {(['x', 'y', 'z'] as const).map((axis) => (
+          <div key={axis} className="relative">
+            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[8px] text-white/25 uppercase">
+              {axis}
+            </span>
+            <input
+              type="number"
+              value={Number(value[axis].toFixed(2))}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v) && v >= min && v <= max) {
+                  onChange({ ...value, [axis]: v });
+                }
+              }}
+              min={min}
+              max={max}
+              step={step}
+              className="w-full bg-white/5 border border-white/10 rounded px-1 pl-5 py-1 text-[10px] text-white/80 outline-none focus:border-white/30 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function ControlPanel({
@@ -47,6 +92,7 @@ export default function ControlPanel({
 }: ControlPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showBodies, setShowBodies] = useState(false);
+  const isCustom = currentPreset === CUSTOM_PRESET_NAME;
 
   const togglePanel = useCallback(() => setIsOpen((o) => !o), []);
 
@@ -240,6 +286,28 @@ export default function ControlPanel({
                         className="slider w-full"
                       />
                     </div>
+
+                    {/* Position & Velocity inputs for Custom preset */}
+                    {isCustom && (
+                      <>
+                        <Vec3Input
+                          label="Position"
+                          value={body.position}
+                          onChange={(v) => onBodyUpdate(i, { position: v })}
+                          min={-10}
+                          max={10}
+                          step={0.1}
+                        />
+                        <Vec3Input
+                          label="Velocity"
+                          value={body.velocity}
+                          onChange={(v) => onBodyUpdate(i, { velocity: v })}
+                          min={-5}
+                          max={5}
+                          step={0.05}
+                        />
+                      </>
+                    )}
                   </div>
                 ))}
               </div>

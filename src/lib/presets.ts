@@ -179,12 +179,48 @@ const butterfly: Preset = {
   ],
 };
 
+/**
+ * Custom — user-defined initial conditions
+ */
+const custom: Preset = {
+  name: 'Custom',
+  description: 'Set your own initial positions, velocities, and masses.',
+  dt: 0.002,
+  recommended2D: false,
+  bodies: [
+    {
+      mass: 1,
+      position: vec3(1, 0, 0),
+      velocity: vec3(0, 0.5, 0),
+      color: DEFAULT_COLORS[0],
+      size: DEFAULT_SIZES[0],
+    },
+    {
+      mass: 1,
+      position: vec3(-1, 0, 0),
+      velocity: vec3(0, -0.5, 0),
+      color: DEFAULT_COLORS[1],
+      size: DEFAULT_SIZES[1],
+    },
+    {
+      mass: 1,
+      position: vec3(0, 1, 0),
+      velocity: vec3(-0.5, 0, 0),
+      color: DEFAULT_COLORS[2],
+      size: DEFAULT_SIZES[2],
+    },
+  ],
+};
+
+export const CUSTOM_PRESET_NAME = 'Custom';
+
 export const PRESETS: Preset[] = [
   figureEight,
   lagrangeTriangle,
   brouckeA2,
   butterfly,
   chaotic,
+  custom,
 ];
 
 export function getPresetByName(name: string): Preset | undefined {

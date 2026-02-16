@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Stars, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { Body } from '@/lib/physics';
@@ -11,9 +11,13 @@ interface Scene3DProps {
   showTrails: boolean;
 }
 
+export interface Scene3DHandle {
+  resetCamera: () => void;
+}
+
 function BodyMesh({ body }: { body: Body }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const color = useMemo(() => new THREE.Color(body.color), [body.color]);
+  const color = new THREE.Color(body.color);
 
   useFrame(() => {
     if (meshRef.current) {
@@ -41,12 +45,10 @@ function BodyMesh({ body }: { body: Body }) {
 }
 
 function Trail({ body }: { body: Body }) {
-  const points = useMemo(() => {
-    if (body.trail.length < 2) return null;
-    return body.trail.map((p) => new THREE.Vector3(p.x, p.y, p.z));
-  }, [body.trail]);
+  // Don't memoize — trail array is mutated each frame, we need fresh points every render
+  if (body.trail.length < 2) return null;
 
-  if (!points) return null;
+  const points = body.trail.map((p) => new THREE.Vector3(p.x, p.y, p.z));
 
   return (
     <Line
@@ -59,7 +61,42 @@ function Trail({ body }: { body: Body }) {
   );
 }
 
-function SceneContent({ bodies, showTrails }: Scene3DProps) {
+function CameraResetter({ resetSignal }: { resetSignal: number }) {
+  const { camera } = useThree();
+  const lastSignal = useRef(resetSignal);
+  const controlsRef = useRef<any>(null);
+
+  useFrame(() => {
+    if (resetSignal !== lastSignal.current) {
+      lastSignal.current = resetSignal;
+      camera.position.set(0, 0, 8);
+      camera.lookAt(0, 0, 0);
+      if (controlsRef.current) {
+        controlsRef.current.reset();
+      }
+    }
+  });
+
+  return null;
+}
+
+function SceneContent({ bodies, showTrails, resetSignal }: Scene3DProps & { resetSignal: number }) {
+  const controlsRef = useRef<any>(null);
+  const { camera } = useThree();
+  const lastSignal = useRef(resetSignal);
+
+  useFrame(() => {
+    if (resetSignal !== lastSignal.current) {
+      lastSignal.current = resetSignal;
+      camera.position.set(0, 0, 8);
+      camera.lookAt(0, 0, 0);
+      if (controlsRef.current) {
+        controlsRef.current.target.set(0, 0, 0);
+        controlsRef.current.update();
+      }
+    }
+  });
+
   return (
     <>
       <ambientLight intensity={0.3} />
@@ -75,6 +112,7 @@ function SceneContent({ bodies, showTrails }: Scene3DProps) {
         bodies.map((body, i) => <Trail key={`trail-${i}`} body={body} />)}
       
       <OrbitControls
+        ref={controlsRef}
         enablePan
         enableZoom
         enableRotate
@@ -86,16 +124,26 @@ function SceneContent({ bodies, showTrails }: Scene3DProps) {
   );
 }
 
-export default function Scene3D({ bodies, showTrails }: Scene3DProps) {
-  return (
-    <div className="w-full h-full absolute inset-0">
-      <Canvas
-        camera={{ position: [0, 0, 8], fov: 60 }}
-        gl={{ antialias: true, alpha: false }}
-        style={{ background: '#0a0a0f' }}
-      >
-        <SceneContent bodies={bodies} showTrails={showTrails} />
-      </Canvas>
-    </div>
-  );
-}
+const Scene3D = forwardRef<Scene3DHandle, Scene3DProps & { resetSignal: number }>(
+  function Scene3D({ bodies, showTrails, resetSignal }, ref) {
+    const resetCamera = useCallback(() => {
+      // Handled via resetSignal prop
+    }, []);
+
+    useImperativeHandle(ref, () => ({ resetCamera }), [resetCamera]);
+
+    return (
+      <div className="w-full h-full absolute inset-0">
+        <Canvas
+          camera={{ position: [0, 0, 8], fov: 60 }}
+          gl={{ antialias: true, alpha: false }}
+          style={{ background: '#0a0a0f' }}
+        >
+          <SceneContent bodies={bodies} showTrails={showTrails} resetSignal={resetSignal} />
+        </Canvas>
+      </div>
+    );
+  }
+);
+
+export default Scene3D;

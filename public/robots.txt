@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://three-body-problem.vercel.app/sitemap.xml

@@ -34,10 +34,6 @@ Unlike the two-body problem (which yields clean Kepler orbits), the three-body p
 | [Lucide React](https://lucide.dev) | Icon library |
 | [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) | Sound design |
 
-## 🎨 Favicon Prompt
-
-> A minimal, dark favicon depicting three glowing celestial bodies in orbital motion against a deep space background. The bodies are coloured coral-red, teal, and golden-yellow with subtle glow effects. Trails of light trace their curved paths. The style is clean, geometric, and modern — suitable for a 32×32 or 512×512 icon. Dark background (#0a0a0f).
-
 ## 👤 Credits
 
 Developed by **Henry Tolenaar**.
